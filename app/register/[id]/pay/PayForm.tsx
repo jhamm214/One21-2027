@@ -55,8 +55,8 @@ export default function PayForm({
     const data = {
       api_login_id: fortePublicKey,
       card_number: el("card_number"),
-      expire_year: Number(el("exp_year")),
-      expire_month: Number(el("exp_month")),
+      expire_year: el("exp_year"),
+      expire_month: el("exp_month"),
       cvv: el("cvv"),
     };
 
