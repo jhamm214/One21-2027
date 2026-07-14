@@ -13,7 +13,7 @@ export const CONFERENCE = {
 
 export const DATES = {
   /** Registration form goes live. */
-  registrationOpens: "2026-09-01",
+  registrationOpens: "2026-07-14",
 
   /**
    * Last day an agent may CHOOSE the 3-payment plan.
