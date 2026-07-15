@@ -73,7 +73,8 @@ export default async function PayPage({
 
   const isInstallment = reg.plan === "installment";
 
- <PayForm
+  return (
+    <PayForm
       registrationId={reg.id}
       agentName={reg.agent_name}
       isInstallment={isInstallment}
