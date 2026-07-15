@@ -14,6 +14,7 @@ function headers() {
     Authorization: `Basic ${basic}`,
     "X-Forte-Auth-Organization-Id": ORG,
     "Content-Type": "application/json",
+    Accept: "application/json",
   };
 }
 
@@ -40,7 +41,12 @@ function parse(data: any): ForteResult {
     last4: data?.card?.last_4_account_number,
     cardType: data?.card?.card_type,
     code,
-    message: data?.response?.response_desc,
+    message:
+      data?.response?.response_desc ??
+      data?.message ??
+      (Array.isArray(data?.errors)
+        ? data.errors.map((e) => e.description ?? e.message ?? JSON.stringify(e)).join(" | ")
+        : undefined),
     raw: data,
   };
 }
@@ -57,19 +63,23 @@ export async function saleWithOneTimeToken(opts: {
   billing: Billing;
   saveToken?: boolean;
 }): Promise<ForteResult> {
+  const body = {
+    action: "sale",
+    authorization_amount: opts.amount,
+    reference_id: opts.referenceId,
+    billing_address: opts.billing,
+    onetime_token: opts.oneTimeToken,
+    save_token: opts.saveToken ?? false,
+  };
   const res = await fetch(txnUrl(), {
     method: "POST",
     headers: headers(),
-    body: JSON.stringify({
-      action: "sale",
-      authorization_amount: opts.amount,
-      reference_id: opts.referenceId,
-      billing_address: opts.billing,
-      payment_token: opts.oneTimeToken,
-      save_token: opts.saveToken ?? false,
-    }),
+    body: JSON.stringify(body),
   });
-  return parse(await res.json());
+  const data = await res.json();
+  console.log("FORTE sale request:", JSON.stringify(body));
+  console.log("FORTE sale response:", JSON.stringify(data));
+  return parse(data);
 }
 
 export async function saleWithStoredToken(opts: {
@@ -84,10 +94,12 @@ export async function saleWithStoredToken(opts: {
       action: "sale",
       authorization_amount: opts.amount,
       reference_id: opts.referenceId,
-      payment_token: opts.paymethodToken,
+      paymethod_token: opts.paymethodToken,
     }),
   });
-  return parse(await res.json());
+  const data = await res.json();
+  console.log("FORTE stored-sale response:", JSON.stringify(data));
+  return parse(data);
 }
 
 export async function refund(opts: {
