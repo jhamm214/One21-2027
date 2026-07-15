@@ -1,99 +1,196 @@
-import { NextRequest, NextResponse } from "next/server";
-import { q, one, audit } from "@/lib/db";
-import { confirmFormReceived } from "@/lib/email";
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   PRICING,
+  OFFICES,
+  OFFICE_RSM,
+  DATES,
+  INCLUSIONS,
+  money,
+  longDate,
   installmentsAvailable,
-  registrationOpen,
-  installmentSchedule,
-  today,
 } from "@/lib/config";
 
-/**
- * ONE form, submitted BEFORE any payment.
- *
- * This is the fix for last year's biggest failure: agents who intended to come
- * but never appeared on an attendee list. Everyone who submits this form exists
- * in the database from that moment, paid or not. Nobody falls through.
- */
-export async function POST(req: NextRequest) {
-  const b = await req.json();
+export default function RegisterPage() {
+  const router = useRouter();
+  const threePay = installmentsAvailable();
 
-  if (!registrationOpen()) {
-    return NextResponse.json({ error: "Registration is closed." }, { status: 400 });
-  }
+  const [plan, setPlan] = useState<"full" | "installment">("full");
+  const [office, setOffice] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const required = ["agent_name", "office", "rsm", "email", "phone", "plan"];
-  for (const f of required) {
-    if (!b[f]) return NextResponse.json({ error: `Missing ${f}` }, { status: 400 });
-  }
+  const rsm = office ? OFFICE_RSM[office] : "";
 
-  if (b.plan !== "full" && b.plan !== "installment") {
-    return NextResponse.json({ error: "Invalid plan." }, { status: 400 });
-  }
+  async function submit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
 
-  // Option A, enforced. After the cutoff the 3-pay plan does not exist —
-  // not in the UI, and not here either. Never trust the client.
-  if (b.plan === "installment" && !installmentsAvailable()) {
-    return NextResponse.json(
-      { error: "The installment plan closed on November 15, 2026. Pay in full only." },
-      { status: 400 }
-    );
-  }
+    const fd = new FormData(e.currentTarget);
+    const payload = Object.fromEntries(fd.entries());
+    payload.plan = plan;
+    payload.office = office;
+    payload.rsm = rsm;
 
-  const dupe = await one(
-    `select id, status from registrations
-      where lower(email) = lower($1) and status <> 'cancelled'`,
-    [b.email]
-  );
-  if (dupe) {
-    return NextResponse.json(
-      { error: "A registration already exists for this email.", id: dupe.id },
-      { status: 409 }
-    );
-  }
+    const res = await fetch("/api/registrations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
 
-  const reg = await one<{ id: string }>(
-    `insert into registrations
-       (agent_name, agent_id, office, rsm, email, phone, dietary, accessibility,
-        plan, amount_total, status)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'pending_payment')
-     returning id`,
-    [
-      b.agent_name,
-      b.agent_id ?? null,
-      b.office,
-      b.rsm,
-      b.email,
-      b.phone,
-      b.dietary ?? null,
-      b.accessibility ?? null,
-      b.plan,
-      PRICING.fullAmount,
-    ]
-  );
-
-  // Write the payment schedule up front. For a 3-pay plan that's three rows,
-  // due today / Dec 16 / Jan 15. The cron works off these.
-  if (b.plan === "installment") {
-    const dues = installmentSchedule(today());
-    for (let i = 0; i < PRICING.installmentCount; i++) {
-      await q(
-        `insert into payments (registration_id, installment_no, amount, due_date, status)
-         values ($1,$2,$3,$4,'scheduled')`,
-        [reg!.id, i + 1, PRICING.installmentAmount, dues[i]]
-      );
+    if (!res.ok) {
+      setError(data.error ?? "Something went wrong. Call Rebecca.");
+      setBusy(false);
+      return;
     }
-  } else {
-    await q(
-      `insert into payments (registration_id, installment_no, amount, due_date, status)
-       values ($1, null, $2, $3, 'scheduled')`,
-      [reg!.id, PRICING.fullAmount, today()]
-    );
+    router.push(`/register/${data.id}/pay`);
   }
 
-  await audit(reg!.id, "system", "created", { plan: b.plan, office: b.office });
-  await confirmFormReceived(b.email, b.agent_name, reg!.id);
+  return (
+    <>
+      <p className="eyebrow">Step 1 of 2</p>
+      <h1>Your registration</h1>
+      <p style={{ color: "var(--ink-70)" }}>
+        Fill this out once. We'll take payment on the next screen.
+      </p>
 
-  return NextResponse.json({ id: reg!.id });
+      {error && <div className="error">{error}</div>}
+
+      <form onSubmit={submit}>
+        <div className="card">
+          <h3>About you</h3>
+
+          <div className="field">
+            <label htmlFor="agent_name">Full name</label>
+            <input id="agent_name" name="agent_name" required autoComplete="name" />
+          </div>
+
+          <div className="row">
+            <div className="field">
+              <label htmlFor="email">Email</label>
+              <input id="email" name="email" type="email" required autoComplete="email" />
+            </div>
+            <div className="field">
+              <label htmlFor="phone">Mobile</label>
+              <input id="phone" name="phone" type="tel" required autoComplete="tel" />
+            </div>
+          </div>
+
+          <div className="row">
+            <div className="field">
+              <label htmlFor="office">Office</label>
+              <select
+                id="office"
+                name="office"
+                required
+                value={office}
+                onChange={(e) => setOffice(e.target.value)}
+              >
+                <option value="" disabled>
+                  Select your office
+                </option>
+                {OFFICES.map((o) => (
+                  <option key={o} value={o}>
+                    {o}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor="rsm_display">Your RSM</label>
+              <input
+                id="rsm_display"
+                value={rsm}
+                readOnly
+                placeholder="Select an office first"
+                style={{ background: "var(--shell)", color: "var(--ink-70)" }}
+              />
+            </div>
+          </div>
+
+          <div className="field">
+            <label htmlFor="dietary">Dietary needs (optional)</label>
+            <input id="dietary" name="dietary" />
+          </div>
+          <div className="field">
+            <label htmlFor="accessibility">Accessibility needs (optional)</label>
+            <input id="accessibility" name="accessibility" />
+          </div>
+        </div>
+
+        <div className="card">
+          <h3>How you'd like to pay</h3>
+
+          <div className="scope">
+            <b>{INCLUSIONS.covers}</b>
+            {INCLUSIONS.notCovered}
+          </div>
+
+          <label
+            className={`card ${plan === "full" ? "selected" : ""}`}
+            style={{ cursor: "pointer", marginBottom: 12 }}
+          >
+            <div className="check">
+              <input
+                type="radio"
+                name="planChoice"
+                checked={plan === "full"}
+                onChange={() => setPlan("full")}
+              />
+              <div>
+                <strong>Pay in full — {money(PRICING.fullAmount)}</strong>
+                <div style={{ fontSize: "0.9rem", color: "var(--slate)" }}>
+                  Charged today. Your seat is confirmed immediately.
+                </div>
+              </div>
+            </div>
+          </label>
+
+          {threePay ? (
+            <label
+              className={`card ${plan === "installment" ? "selected" : ""}`}
+              style={{ cursor: "pointer", marginBottom: 0 }}
+            >
+              <div className="check">
+                <input
+                  type="radio"
+                  name="planChoice"
+                  checked={plan === "installment"}
+                  onChange={() => setPlan("installment")}
+                />
+                <div>
+                  <strong>
+                    {PRICING.installmentCount} payments of{" "}
+                    {money(PRICING.installmentAmount)}
+                  </strong>
+                  <div style={{ fontSize: "0.9rem", color: "var(--slate)" }}>
+                    Today, {longDate(DATES.installment2)}, and{" "}
+                    {longDate(DATES.installment3)}. Charged automatically to the
+                    card you provide.
+                    <br />
+                    <strong>
+                      Your seat is reserved until the final payment clears, then
+                      Confirmed.
+                    </strong>
+                  </div>
+                </div>
+              </div>
+            </label>
+          ) : (
+            <p style={{ fontSize: "0.9rem", color: "var(--slate)" }}>
+              The 3-payment plan closed on {longDate(DATES.installmentCutoff)}.
+            </p>
+          )}
+        </div>
+
+        <button type="submit" disabled={busy}>
+          {busy ? "Saving…" : "Continue to payment"}
+        </button>
+      </form>
+    </>
+  );
 }
