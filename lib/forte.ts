@@ -45,7 +45,7 @@ function parse(data: any): ForteResult {
       data?.response?.response_desc ??
       data?.message ??
       (Array.isArray(data?.errors)
-        ? data.errors.map((e) => e.description ?? e.message ?? JSON.stringify(e)).join(" | ")
+        ? data.errors.map((e: any) => e.description ?? e.message ?? JSON.stringify(e)).join(" | ")
         : undefined),
     raw: data,
   };
