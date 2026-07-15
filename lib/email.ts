@@ -125,3 +125,82 @@ export function notifyContact(name: string, phone: string, email: string, id: st
      <p>The system will cancel and release the seat 14 days after the original due date if this isn't cured.</p>`
   );
 }
+
+/** Notify Rebecca on EVERY successful charge. Flags the ones that complete. */
+export function notifyRebeccaPayment(opts: {
+  agentName: string;
+  office: string;
+  amount: number;
+  plan: "full" | "installment";
+  installmentNo: number | null;
+  completed: boolean; // true when this payment brings them to paid-in-full
+}) {
+  const kind = opts.completed
+    ? opts.plan === "installment"
+      ? "COMPLETED their payment plan"
+      : "PAID IN FULL"
+    : `made installment payment ${opts.installmentNo} of ${PRICING.installmentCount}`;
+
+  const banner = opts.completed
+    ? `<p style="background:#e8f5ee;border-left:3px solid #1e6b45;padding:12px 16px;font-weight:600;color:#1e6b45">
+         ✓ Registration complete — ${opts.agentName} is confirmed for the conference.
+       </p>`
+    : "";
+
+  return send(
+    CONTACT.email,
+    opts.completed
+      ? `✓ CONFIRMED: ${opts.agentName} — conference registration complete`
+      : `Payment received: ${opts.agentName} (${money(opts.amount)})`,
+    `<h2>${opts.agentName} ${kind}.</h2>
+     ${banner}
+     <p><strong>Office:</strong> ${opts.office}<br>
+        <strong>Amount:</strong> ${money(opts.amount)}<br>
+        <strong>Plan:</strong> ${opts.plan === "full" ? "Paid in full" : "3-payment plan"}</p>`
+  );
+}
+
+/** Weekly outstanding-payments report emailed to Rebecca. */
+export function outstandingReport(
+  rows: Array<{
+    agent_name: string;
+    office: string;
+    balance: number;
+    paid_count: number;
+    next_due: string | null;
+  }>,
+  totalOutstanding: number
+) {
+  const body =
+    rows.length === 0
+      ? `<p>Everyone on a payment plan is paid up. Nothing outstanding.</p>`
+      : `<p><strong>${rows.length}</strong> ${
+          rows.length === 1 ? "agent is" : "agents are"
+        } mid-plan, with <strong>${money(totalOutstanding)}</strong> still to collect.</p>
+         <table style="width:100%;border-collapse:collapse;font-size:14px">
+           <tr style="text-align:left;border-bottom:2px solid #111">
+             <th style="padding:6px">Agent</th><th style="padding:6px">Office</th>
+             <th style="padding:6px">Balance</th><th style="padding:6px">Made</th>
+             <th style="padding:6px">Next due</th>
+           </tr>
+           ${rows
+             .map(
+               (r) => `<tr style="border-bottom:1px solid #ddd">
+                 <td style="padding:6px">${r.agent_name}</td>
+                 <td style="padding:6px">${r.office}</td>
+                 <td style="padding:6px">${money(Number(r.balance))}</td>
+                 <td style="padding:6px">${r.paid_count}/${PRICING.installmentCount}</td>
+                 <td style="padding:6px">${
+                   r.next_due ? longDate(String(r.next_due).slice(0, 10)) : "—"
+                 }</td>
+               </tr>`
+             )
+             .join("")}
+         </table>`;
+
+  return send(
+    CONTACT.email,
+    `Outstanding conference payments — ${rows.length} on a plan`,
+    `<h2>Outstanding payment report</h2>${body}`
+  );
+}

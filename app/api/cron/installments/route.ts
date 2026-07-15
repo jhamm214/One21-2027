@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { q, audit } from "@/lib/db";
 import { saleWithStoredToken } from "@/lib/forte";
-import { paymentFailed, confirmPaidInFull, notifyContact } from "@/lib/email";
+import { paymentFailed, confirmPaidInFull, notifyContact, notifyRebeccaPayment } from "@/lib/email";
 import { DUNNING } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
@@ -22,8 +22,23 @@ export async function GET(req: NextRequest) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
+  // Clean up abandoned registrations: a declined first charge stamped
+  // expires_at 2 hours out. If still unpaid past that, remove it so the admin
+  // list and counts stay clean. (Runs daily; the stamp is 2h so this catches
+  // anything from the prior day. Cascades delete the linked payment rows.)
+  const expired = await q<any>(
+    `delete from registrations
+      where status = 'pending_payment'
+        and expires_at is not null
+        and expires_at < now()
+      returning id`
+  );
+  for (const e of expired) {
+    await audit(e.id, "cron", "expired", { reason: "declined, unpaid past 2h" });
+  }
+
   const due = await q<any>(
-    `select p.*, r.email, r.agent_name, r.phone, r.amount_paid, r.amount_total
+    `select p.*, r.email, r.agent_name, r.phone, r.office, r.amount_paid, r.amount_total
        from payments p
        join registrations r on r.id = p.registration_id
       where p.forte_paymethod_token is not null
@@ -89,6 +104,14 @@ export async function GET(req: NextRequest) {
       if (paidInFull) {
         await confirmPaidInFull(p.email, p.agent_name, p.registration_id);
       }
+      await notifyRebeccaPayment({
+        agentName: p.agent_name,
+        office: p.office ?? "",
+        amount: Number(p.amount),
+        plan: "installment",
+        installmentNo: p.installment_no,
+        completed: paidInFull,
+      });
       log.push({ id: p.id, action: "charged" });
     } else {
       const attempts = p.attempts + 1;

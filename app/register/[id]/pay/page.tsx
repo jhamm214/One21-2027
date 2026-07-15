@@ -80,9 +80,6 @@ export default async function PayPage({
       isInstallment={isInstallment}
       amountToday={isInstallment ? PRICING.installmentAmount : PRICING.fullAmount}
       consentText={isInstallment ? CONSENT_INSTALLMENT : CONSENT_FULL}
-      fortePublicKey={process.env.NEXT_PUBLIC_FORTE_API_ACCESS_ID!}
-      forteLocationId={process.env.NEXT_PUBLIC_FORTE_LOCATION_ID!}
-      forteJsUrl={process.env.NEXT_PUBLIC_FORTE_JS_URL!}
     />
   );
 }

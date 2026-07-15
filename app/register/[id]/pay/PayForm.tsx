@@ -1,49 +1,34 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import Script from "next/script";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { PRICING, DATES, INCLUSIONS, money, longDate } from "@/lib/config";
 
-declare global {
-  interface Window {
-    forte: any;
-  }
-}
-
+/**
+ * The card fields are posted to our /api/payments/charge endpoint, which runs
+ * the sale via Forte's REST API server-side. No Forte.js in the browser.
+ */
 export default function PayForm({
   registrationId,
   agentName,
   isInstallment,
   amountToday,
   consentText,
-  fortePublicKey,
-  forteLocationId,
-  forteJsUrl,
 }: {
   registrationId: string;
   agentName: string;
   isInstallment: boolean;
   amountToday: number;
   consentText: string;
-  fortePublicKey: string;
-  forteLocationId: string;
-  forteJsUrl: string;
 }) {
   const router = useRouter();
-  const [ready, setReady] = useState(false);
   const [accepted, setAccepted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const formRef = useRef<HTMLDivElement>(null);
 
   async function pay() {
     if (!accepted) {
       setError("Please accept the payment authorization to continue.");
-      return;
-    }
-    if (!window.forte) {
-      setError("The payment form is still loading. Give it a second and try again.");
       return;
     }
     setBusy(true);
@@ -52,53 +37,30 @@ export default function PayForm({
     const el = (id: string) =>
       (document.getElementById(id) as HTMLInputElement).value.trim();
 
-    const data = {
-      api_login_id: fortePublicKey,
-      card_number: el("card_number"),
-      expire_year: el("exp_year"),
-      expire_month: el("exp_month"),
-      cvv: el("cvv"),
-    };
+    const r = await fetch("/api/payments/charge", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        registration_id: registrationId,
+        consent_accepted: true,
+        card_number: el("card_number"),
+        expire_month: el("exp_month"),
+        expire_year: el("exp_year"),
+        cvv: el("cvv"),
+      }),
+    });
+    const out = await r.json();
 
-    window.forte
-      .createToken(data)
-      .success(async (res: any) => {
-        const token = res?.onetime_token ?? res?.token;
-        if (!token) {
-          setError("We couldn't read that card. Check the number and try again.");
-          setBusy(false);
-          return;
-        }
-        const r = await fetch("/api/payments/charge", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            registration_id: registrationId,
-            one_time_token: token,
-            consent_accepted: true,
-          }),
-        });
-        const out = await r.json();
-        if (!r.ok) {
-          setError(out.error ?? "Your card was declined. Try another card.");
-          setBusy(false);
-          return;
-        }
-        router.refresh();
-      })
-      .error((res: any) => {
-        setError(
-          res?.response_description ??
-            "We couldn't process that card. Check the details and try again."
-        );
-        setBusy(false);
-      });
+    if (!r.ok) {
+      setError(out.error ?? "Your card was declined. Try another card.");
+      setBusy(false);
+      return;
+    }
+    router.refresh();
   }
 
   return (
     <>
-      <Script src={forteJsUrl} onLoad={() => setReady(true)} />
-
       <p className="eyebrow">Step 2 of 2</p>
       <h1>Payment</h1>
 
@@ -135,7 +97,7 @@ export default function PayForm({
         </div>
       </div>
 
-      <div className="card" ref={formRef}>
+      <div className="card">
         <h3>Card details</h3>
 
         <div className="field">
@@ -178,11 +140,6 @@ export default function PayForm({
       <button onClick={pay} disabled={busy || !accepted}>
         {busy ? "Processing…" : `Pay ${money(amountToday)}`}
       </button>
-      {!ready && (
-        <p style={{ fontSize: "0.82rem", color: "var(--slate)", marginTop: 10 }}>
-          Loading secure payment…
-        </p>
-      )}
     </>
   );
 }

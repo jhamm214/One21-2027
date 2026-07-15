@@ -1,5 +1,9 @@
 /**
  * CSG Forte REST API v3 client. SERVER-SIDE ONLY.
+ *
+ * One-time token from Forte.js goes in the transaction body as `onetime_token`
+ * at the top level (Forte v3). Org/location are prefixed (org_, loc_) and sent
+ * in the URL and the X-Forte-Auth-Organization-Id header.
  */
 
 const BASE = process.env.FORTE_BASE_URL!;
@@ -41,6 +45,7 @@ function parse(data: any): ForteResult {
     last4: data?.card?.last_4_account_number,
     cardType: data?.card?.card_type,
     code,
+    // Surface Forte's raw error text so failures are legible.
     message:
       data?.response?.response_desc ??
       data?.message ??
@@ -68,6 +73,7 @@ export async function saleWithOneTimeToken(opts: {
     authorization_amount: opts.amount,
     reference_id: opts.referenceId,
     billing_address: opts.billing,
+    // Forte v3: a Forte.js one-time token nests inside the card object.
     card: { one_time_token: opts.oneTimeToken },
     save_token: opts.saveToken ?? false,
   };
@@ -77,6 +83,7 @@ export async function saleWithOneTimeToken(opts: {
     body: JSON.stringify(body),
   });
   const data = await res.json();
+  // Log the full exchange in Vercel's function logs for diagnosis.
   console.log("FORTE sale request:", JSON.stringify(body));
   console.log("FORTE sale response:", JSON.stringify(data));
   return parse(data);
