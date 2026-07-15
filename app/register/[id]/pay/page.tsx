@@ -73,13 +73,14 @@ export default async function PayPage({
 
   const isInstallment = reg.plan === "installment";
 
-  return (
-    <PayForm
+ <PayForm
       registrationId={reg.id}
       agentName={reg.agent_name}
       isInstallment={isInstallment}
       amountToday={isInstallment ? PRICING.installmentAmount : PRICING.fullAmount}
       consentText={isInstallment ? CONSENT_INSTALLMENT : CONSENT_FULL}
+      fortePublicKey={process.env.NEXT_PUBLIC_FORTE_API_ACCESS_ID!}
+      forteJsUrl={process.env.NEXT_PUBLIC_FORTE_JS_URL!}
     />
   );
 }
