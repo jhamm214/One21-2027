@@ -68,7 +68,7 @@ export async function saleWithOneTimeToken(opts: {
     authorization_amount: opts.amount,
     reference_id: opts.referenceId,
     billing_address: opts.billing,
-    onetime_token: opts.oneTimeToken,
+    paymethod: { onetime_token: opts.oneTimeToken },
     save_token: opts.saveToken ?? false,
   };
   const res = await fetch(txnUrl(), {
