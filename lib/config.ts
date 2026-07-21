@@ -6,8 +6,8 @@
  */
 
 export const CONFERENCE = {
-  name: "One21 Conference",
-  shortName: "One21 Conference",
+  name: "ONE21 Conference",
+  shortName: "ONE21 Conference",
   startsOn: "2027-02-27", // Saturday
 } as const;
 
@@ -21,13 +21,13 @@ export const DATES = {
    * After this date the form offers Pay in Full only. Enforced as a date
    * check, not by a human remembering.
    */
-  installmentCutoff: "2026-11-15",
+  installmentCutoff: "2026-10-15",
 
-  installment2: "2026-12-16",
-  installment3: "2027-01-15",
+  installment2: "2026-11-16",
+  installment3: "2026-12-15",
 
   /** Hard deadline. Paid in full or no seat. 30 days before the conference. */
-  registrationDeadline: "2027-01-28",
+  registrationDeadline: "2026-12-31",
 } as const;
 
 export const PRICING = {
@@ -69,10 +69,10 @@ export const OFFICE_RSM: Record<string, string> = {
   "Arlington Regional Office": "Jim Jackson",
   "Cedar Hill Regional Office": "Jon Buck",
   "Dallas - Bishop Arts": "Kevin Robinson",
-  "Flower Mound/Irving Regional Office": "Brad Horak",
+  "Flower Mound/Irving Regional Office": "Anna Hoff",
   "Fort Worth Regional Office": "Cassy Nutt",
   "Grand Prairie Regional Office": "Joe Picardo",
-  "Southlake/Colleyville Regional Office": "Tim Gauntt",
+  "Southlake/Colleyville Regional Office": "Brad Horak",
   "Dallas - Lake Highlands Regional Office": "Betty DeVinney",
   "Decatur/Bridgeport Regional Office": "Allie Hendricks",
   "Denton Regional Office": "Lindsey Grissette",
