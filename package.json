@@ -9,6 +9,12 @@
     "db:push": "psql $DATABASE_URL -f db/schema.sql"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.1.0",
+  "next": "15.5.20",
+  ...
+}
+    
+    
     "next": "^15.1.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
