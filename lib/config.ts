@@ -6,7 +6,7 @@
  */
 
 export const CONFERENCE = {
-  name: "CENTURY 21 Judge Fite Company Conference",
+  name: "ONE21 Conference",
   shortName: "C21JFC Conference",
   startsOn: "2027-02-27", // Saturday
 } as const;
