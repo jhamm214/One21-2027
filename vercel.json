@@ -1,10 +1,12 @@
 {
   "crons": [
     {
+      "comment": "Charge due installments, retry failures, escalate, cancel. Daily 06:00 CT.",
       "path": "/api/cron/installments",
       "schedule": "0 12 * * *"
     },
     {
+      "comment": "Purchase seats for paid_in_full, email RSM digests. Mondays 07:00 CT.",
       "path": "/api/cron/seat-batch",
       "schedule": "0 13 * * 1"
     }

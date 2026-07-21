@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Script from "next/script";
 import { useRouter } from "next/navigation";
 import { PRICING, DATES, INCLUSIONS, money, longDate } from "@/lib/config";
@@ -11,6 +11,13 @@ declare global {
   }
 }
 
+/**
+ * Forte.js tokenizes the card IN THE BROWSER and returns a one-time token.
+ * The card number never touches our server, which keeps us in SAQ-A scope.
+ *
+ * We send the server: the one-time token, the registration id, and the fact
+ * that the agent accepted the authorization. Nothing else.
+ */
 export default function PayForm({
   registrationId,
   agentName,
@@ -18,6 +25,7 @@ export default function PayForm({
   amountToday,
   consentText,
   fortePublicKey,
+  forteLocationId,
   forteJsUrl,
 }: {
   registrationId: string;
@@ -26,6 +34,7 @@ export default function PayForm({
   amountToday: number;
   consentText: string;
   fortePublicKey: string;
+  forteLocationId: string;
   forteJsUrl: string;
 }) {
   const router = useRouter();
@@ -33,14 +42,16 @@ export default function PayForm({
   const [accepted, setAccepted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const formRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!ready || !window.forte) return;
+    window.forte.setAPILoginID(fortePublicKey);
+  }, [ready, fortePublicKey]);
 
   async function pay() {
     if (!accepted) {
       setError("Please accept the payment authorization to continue.");
-      return;
-    }
-    if (!window.forte) {
-      setError("The payment form is still loading. Give it a second and try again.");
       return;
     }
     setBusy(true);
@@ -49,47 +60,42 @@ export default function PayForm({
     const el = (id: string) =>
       (document.getElementById(id) as HTMLInputElement).value.trim();
 
-    const data = {
-      api_login_id: fortePublicKey,
-      card_number: el("card_number"),
-      expire_year: el("exp_year"),
-      expire_month: el("exp_month"),
-      cvv: el("cvv"),
-    };
-
-    window.forte
-      .createToken(data)
-      .success(async (res: any) => {
-        const token = res?.onetime_token ?? res?.token;
-        if (!token) {
-          setError("We couldn't read that card. Check the number and try again.");
+    // Forte.js callback style. Verify the exact signature against the current
+    // Forte.js docs for your account before going to production.
+    window.forte.createToken(
+      {
+        api_login_id: fortePublicKey,
+        account_number: el("card_number"),
+        expire_year: Number(el("exp_year")),
+        expire_month: Number(el("exp_month")),
+        card_verification_value: el("cvv"),
+      },
+      async (res: any) => {
+        if (res?.event === "failure" || !res?.onetime_token) {
+          setError(res?.response_description ?? "We couldn't read that card.");
           setBusy(false);
           return;
         }
+
         const r = await fetch("/api/payments/charge", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             registration_id: registrationId,
-            one_time_token: token,
+            one_time_token: res.onetime_token,
             consent_accepted: true,
           }),
         });
-        const out = await r.json();
+        const data = await r.json();
+
         if (!r.ok) {
-          setError(out.error ?? "Your card was declined. Try another card.");
+          setError(data.error ?? "Your card was declined. Try another card.");
           setBusy(false);
           return;
         }
         router.refresh();
-      })
-      .error((res: any) => {
-        setError(
-          res?.response_description ??
-            "We couldn't process that card. Check the details and try again."
-        );
-        setBusy(false);
-      });
+      }
+    );
   }
 
   return (
@@ -132,7 +138,7 @@ export default function PayForm({
         </div>
       </div>
 
-      <div className="card">
+      <div className="card" ref={formRef}>
         <h3>Card details</h3>
 
         <div className="field">
@@ -157,6 +163,8 @@ export default function PayForm({
         </div>
       </div>
 
+      {/* The authorization. Stored verbatim, with IP and timestamp. This text
+          must match the Registration Packet word for word. */}
       <div className="card">
         <h3>Payment authorization</h3>
         <div className="consent">{consentText}</div>
@@ -172,14 +180,9 @@ export default function PayForm({
         </label>
       </div>
 
-      <button onClick={pay} disabled={busy || !accepted}>
+      <button onClick={pay} disabled={!ready || busy || !accepted}>
         {busy ? "Processing…" : `Pay ${money(amountToday)}`}
       </button>
-      {!ready && (
-        <p style={{ fontSize: "0.82rem", color: "var(--slate)", marginTop: 10 }}>
-          Loading secure payment…
-        </p>
-      )}
     </>
   );
 }

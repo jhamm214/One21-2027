@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { q, audit } from "@/lib/db";
-import { rsmDigest, outstandingReport } from "@/lib/email";
+import { rsmDigest } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 
@@ -54,28 +54,9 @@ export async function GET(req: NextRequest) {
     if (to) await rsmDigest(to, rsm, rows);
   }
 
-  // --- 3. Outstanding-payments report to Rebecca -----------------------------
-  const outstanding = await q<any>(
-    `select r.agent_name, r.office,
-            (r.amount_total - r.amount_paid) as balance,
-            (select count(*) from payments p
-              where p.registration_id = r.id and p.status = 'paid') as paid_count,
-            (select min(due_date) from payments p
-              where p.registration_id = r.id and p.status in ('scheduled','failed')) as next_due
-       from registrations r
-      where r.status = 'reserved'
-      order by next_due nulls last, r.agent_name`
-  );
-  const totalOutstanding = outstanding.reduce(
-    (a, r) => a + Number(r.balance),
-    0
-  );
-  await outstandingReport(outstanding, totalOutstanding);
-
   return NextResponse.json({
     seats_purchased: toPurchase.length,
     digests_sent: rsms.length,
-    outstanding: outstanding.length,
   });
 }
 

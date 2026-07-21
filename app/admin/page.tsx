@@ -31,24 +31,6 @@ export default async function Admin() {
       order by p.due_date`
   );
 
-  // Everyone on a payment plan who hasn't finished paying — the outstanding report.
-  const outstandingRows = await q<any>(
-    `select r.agent_name, r.office, r.rsm, r.email, r.phone,
-            r.amount_paid, r.amount_total,
-            (r.amount_total - r.amount_paid) as balance,
-            (select count(*) from payments p
-              where p.registration_id = r.id and p.status = 'paid') as paid_count,
-            (select min(due_date) from payments p
-              where p.registration_id = r.id and p.status in ('scheduled','failed')) as next_due
-       from registrations r
-      where r.status = 'reserved'
-      order by next_due nulls last, r.agent_name`
-  );
-  const totalOutstanding = outstandingRows.reduce(
-    (a, r) => a + Number(r.balance),
-    0
-  );
-
   return (
     <>
       <p className="eyebrow">Internal</p>
@@ -120,40 +102,6 @@ export default async function Admin() {
             </tbody>
           </table>
         </>
-      )}
-
-      <h2>Outstanding payments ({outstandingRows.length})</h2>
-      <p style={{ color: "var(--slate)" }}>
-        On a payment plan, not yet paid in full. Total still owed:{" "}
-        <strong>{money(totalOutstanding)}</strong>.
-      </p>
-      {outstandingRows.length === 0 ? (
-        <p style={{ color: "var(--slate)" }}>Everyone on a plan is paid up.</p>
-      ) : (
-        <table style={{ marginBottom: 32 }}>
-          <thead>
-            <tr>
-              <th>Agent</th>
-              <th>Office</th>
-              <th>Paid</th>
-              <th>Balance</th>
-              <th>Payments made</th>
-              <th>Next due</th>
-            </tr>
-          </thead>
-          <tbody>
-            {outstandingRows.map((r, i) => (
-              <tr key={i}>
-                <td>{r.agent_name}</td>
-                <td>{r.office}</td>
-                <td>{money(Number(r.amount_paid))}</td>
-                <td><strong>{money(Number(r.balance))}</strong></td>
-                <td>{r.paid_count} of {PRICING.installmentCount}</td>
-                <td>{r.next_due ? longDate(String(r.next_due).slice(0, 10)) : "—"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
       )}
 
       <h2>Everyone ({rows.length})</h2>

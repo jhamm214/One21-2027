@@ -1,6 +1,6 @@
 # C21JFC Conference — Registration & Payment
 
-Registration and payment for the One21 Conference,
+Registration and payment for the CENTURY 21 Judge Fite Company Conference,
 **February 27, 2027**. Next.js + Postgres + CSG Forte.
 
 ---

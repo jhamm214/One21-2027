@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { q, one, audit } from "@/lib/db";
 import { saleWithOneTimeToken } from "@/lib/forte";
-import { confirmPaidInFull, confirmReserved, notifyRebeccaPayment } from "@/lib/email";
+import { confirmPaidInFull, confirmReserved } from "@/lib/email";
 import {
   PRICING,
   CONSENT_FULL,
@@ -10,10 +10,13 @@ import {
 } from "@/lib/config";
 
 /**
- * The FIRST charge. The browser tokenized the card with Forte.js and sent us a
- * ONE-TIME token — no card data touched this server. We charge it via Forte's
- * REST API (token goes in as payment_token). For installments we also save a
- * reusable token so the cron can charge payments 2 and 3.
+ * The FIRST charge. Forte.js tokenized the card in the browser and handed us a
+ * one-time token — no card data has ever touched this server.
+ *
+ * Pay in full  -> charge $690, status = paid_in_full.
+ * Installments -> charge $230, SAVE the paymethod token, status = reserved.
+ *                 The saved token is what makes payments 2 and 3 possible.
+ *                 Without save_token, the 3-pay plan cannot work.
  */
 export async function POST(req: NextRequest) {
   const b = await req.json();
@@ -22,12 +25,6 @@ export async function POST(req: NextRequest) {
   if (!consent_accepted) {
     return NextResponse.json(
       { error: "Payment authorization is required." },
-      { status: 400 }
-    );
-  }
-  if (!one_time_token) {
-    return NextResponse.json(
-      { error: "Card wasn't processed. Please re-enter your card." },
       { status: 400 }
     );
   }
@@ -49,6 +46,8 @@ export async function POST(req: NextRequest) {
   const isInstallment = reg.plan === "installment";
   const amount = isInstallment ? PRICING.installmentAmount : PRICING.fullAmount;
 
+  // Record consent BEFORE charging. Verbatim, with IP and user agent.
+  // This is the chargeback defense, and it must match the packet word for word.
   await q(
     `insert into consents (registration_id, consent_text, ip, user_agent)
      values ($1,$2,$3,$4)`,
@@ -60,13 +59,13 @@ export async function POST(req: NextRequest) {
     ]
   );
 
-  const [first, ...rest] = String(reg.agent_name).trim().split(" ");
+  const [first, last] = String(reg.agent_name).split(" ");
   const result = await saleWithOneTimeToken({
     oneTimeToken: one_time_token,
     amount,
     referenceId: reg.id,
-    billing: { first_name: first ?? reg.agent_name, last_name: rest.join(" ") },
-    saveToken: isInstallment,
+    billing: { first_name: first ?? reg.agent_name, last_name: last ?? "" },
+    saveToken: isInstallment, // <- the whole 3-pay plan hangs on this
   });
 
   const payment = await one<any>(
@@ -82,24 +81,12 @@ export async function POST(req: NextRequest) {
               last_error = $2 where id = $1`,
       [payment.id, result.message ?? result.code ?? "declined"]
     );
-    // Card declined: the registration stays 'pending_payment' so the agent can
-    // retry with another card, but we stamp an expiry. The cleanup cron removes
-    // it if still unpaid 2 hours from now. A later successful charge clears the
-    // stamp (see the success path below).
-    await q(
-      `update registrations set expires_at = now() + interval '2 hours', updated_at = now()
-        where id = $1 and status = 'pending_payment'`,
-      [reg.id]
-    );
-    await audit(reg.id, "system", "failed", { code: result.code, message: result.message });
+    await audit(reg.id, "system", "failed", { code: result.code });
     return NextResponse.json(
       { error: result.message ?? "Your card was declined." },
       { status: 402 }
     );
   }
-
-  // Success: clear any prior decline expiry stamp.
-  await q(`update registrations set expires_at = null where id = $1`, [reg.id]);
 
   await q(
     `update payments
@@ -115,6 +102,7 @@ export async function POST(req: NextRequest) {
     ]
   );
 
+  // Propagate the saved token to the remaining installments so the cron can use it.
   if (isInstallment && result.paymethodToken) {
     await q(
       `update payments set forte_paymethod_token = $2, card_last4 = $3
@@ -143,16 +131,6 @@ export async function POST(req: NextRequest) {
   } else {
     await confirmReserved(reg.email, reg.agent_name, reg.id);
   }
-
-  // Notify Rebecca on every successful charge; flag the completing one.
-  await notifyRebeccaPayment({
-    agentName: reg.agent_name,
-    office: reg.office,
-    amount,
-    plan: reg.plan,
-    installmentNo: isInstallment ? 1 : null,
-    completed: status === "paid_in_full",
-  });
 
   return NextResponse.json({ ok: true, status, last4: result.last4 });
 }
