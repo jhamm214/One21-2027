@@ -23,7 +23,7 @@ export const DATES = {
    */
   installmentCutoff: "2026-10-15",
 
-  installment2: "2026-11-16",
+  installment2: "2026-11-15",
   installment3: "2026-12-15",
 
   /** Hard deadline. Paid in full or no seat. 30 days before the conference. */
