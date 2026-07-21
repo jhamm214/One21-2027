@@ -21,13 +21,13 @@ export const DATES = {
    * After this date the form offers Pay in Full only. Enforced as a date
    * check, not by a human remembering.
    */
-  installmentCutoff: "2026-11-15",
+  installmentCutoff: "2026-10-15",
 
-  installment2: "2026-12-16",
-  installment3: "2027-01-15",
+  installment2: "2026-11-15",
+  installment3: "2026-12-15",
 
   /** Hard deadline. Paid in full or no seat. 30 days before the conference. */
-  registrationDeadline: "2027-01-28",
+  registrationDeadline: "2026-12-31",
 } as const;
 
 export const PRICING = {
@@ -85,7 +85,7 @@ export const OFFICES = [
 // chargeback defense weakens.
 // ---------------------------------------------------------------------------
 
-export const CONSENT_INSTALLMENT = `Installment payment authorization. I authorize CENTURY 21 Judge Fite Company to charge the card I have provided $230.00 today, $230.00 on December 16, 2026, and $230.00 on January 15, 2027, for a total of $690.00. I understand my registration is Reserved until my final payment clears, and is Confirmed only when the full $690.00 has been received. I understand my $690.00 covers conference registration only — hotel, travel, and meals are booked and paid separately by me. I understand that if a scheduled payment fails and is not cured within 14 days, my registration will be cancelled and my seat released.`;
+export const CONSENT_INSTALLMENT = `Installment payment authorization. I authorize CENTURY 21 Judge Fite Company to charge the card I have provided $230.00 today, $230.00 on November 15, 2026, and $230.00 on December 15, 2026, for a total of $690.00. I understand my registration is Reserved until my final payment clears, and is Confirmed only when the full $690.00 has been received. I understand my $690.00 covers conference registration only — hotel, travel, and meals are booked and paid separately by me. I understand that if a scheduled payment fails and is not cured within 14 days, my registration will be cancelled and my seat released.`;
 
 export const CONSENT_FULL = `Payment authorization. I authorize CENTURY 21 Judge Fite Company to charge the card I have provided $690.00 today. I understand my $690.00 covers conference registration only — hotel, travel, and meals are booked and paid separately by me.`;
 
