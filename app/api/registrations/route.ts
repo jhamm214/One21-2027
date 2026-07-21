@@ -13,8 +13,8 @@ export async function POST(req: NextRequest) {
     }
 
     // persist the registration here — DB insert, sheet append, whatever you're using
-    const id = /* your saved record id */ "";
-
+    const record = await db.registration.create({ data: payload });
+return NextResponse.json({ id: record.id }, { status: 201 });
     return NextResponse.json({ id }, { status: 201 });
   } catch {
     return NextResponse.json(
