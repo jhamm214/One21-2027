@@ -61,9 +61,17 @@ export const DUNNING = {
   cancelAfterDays: 14, // cancel + release the seat
 } as const;
 
+// ---------------------------------------------------------------------------
+// REPLACE the existing `export const OFFICES = [...] as const;` block in
+// lib/config.ts with everything below.
+// ---------------------------------------------------------------------------
+
 /**
  * Office → Regional Sales Manager. Picking an office auto-fills the RSM on the
  * form, so agents can't mistype it. Single source of truth for both.
+ *
+ * OFFICES is derived from these keys, so the dropdown and the lookup can never
+ * disagree. Do not maintain a separate office list anywhere else.
  */
 export const OFFICE_RSM: Record<string, string> = {
   "Arlington Regional Office": "Jim Jackson",
@@ -96,7 +104,6 @@ export const OFFICE_RSM: Record<string, string> = {
 };
 
 export const OFFICES = Object.keys(OFFICE_RSM);
-
 // ---------------------------------------------------------------------------
 // Payment authorization — stored verbatim in consents.consent_text.
 // MUST match the Registration Packet word for word. If they drift, the
