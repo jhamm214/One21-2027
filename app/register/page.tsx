@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   PRICING,
   OFFICES,
+  OFFICE_RSM,
   DATES,
   INCLUSIONS,
   money,
@@ -12,21 +13,16 @@ import {
   installmentsAvailable,
 } from "@/lib/config";
 
-/**
- * ONE form. Submitted before any payment.
- *
- * The plan choice lives here, but no card is collected on this page — the
- * registration row is created first, so an agent who abandons at the payment
- * step still exists in the system and still shows up on the RSM's weekly list.
- * That is the fix for last year's missing-agents problem.
- */
 export default function RegisterPage() {
   const router = useRouter();
   const threePay = installmentsAvailable();
 
   const [plan, setPlan] = useState<"full" | "installment">("full");
+  const [office, setOffice] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const rsm = office ? OFFICE_RSM[office] : "";
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -36,6 +32,8 @@ export default function RegisterPage() {
     const fd = new FormData(e.currentTarget);
     const payload = Object.fromEntries(fd.entries());
     payload.plan = plan;
+    payload.office = office;
+    payload.rsm = rsm;
 
     const res = await fetch("/api/registrations", {
       method: "POST",
@@ -66,15 +64,9 @@ export default function RegisterPage() {
         <div className="card">
           <h3>About you</h3>
 
-          <div className="row">
-            <div className="field">
-              <label htmlFor="agent_name">Full name</label>
-              <input id="agent_name" name="agent_name" required autoComplete="name" />
-            </div>
-            <div className="field">
-              <label htmlFor="agent_id">Agent ID (if you have it)</label>
-              <input id="agent_id" name="agent_id" />
-            </div>
+          <div className="field">
+            <label htmlFor="agent_name">Full name</label>
+            <input id="agent_name" name="agent_name" required autoComplete="name" />
           </div>
 
           <div className="row">
@@ -91,7 +83,13 @@ export default function RegisterPage() {
           <div className="row">
             <div className="field">
               <label htmlFor="office">Office</label>
-              <select id="office" name="office" required defaultValue="">
+              <select
+                id="office"
+                name="office"
+                required
+                value={office}
+                onChange={(e) => setOffice(e.target.value)}
+              >
                 <option value="" disabled>
                   Select your office
                 </option>
@@ -103,8 +101,14 @@ export default function RegisterPage() {
               </select>
             </div>
             <div className="field">
-              <label htmlFor="rsm">Your RSM</label>
-              <input id="rsm" name="rsm" required />
+              <label htmlFor="rsm_display">Your RSM</label>
+              <input
+                id="rsm_display"
+                value={rsm}
+                readOnly
+                placeholder="Select an office first"
+                style={{ background: "var(--shell)", color: "var(--ink-70)" }}
+              />
             </div>
           </div>
 
@@ -169,7 +173,7 @@ export default function RegisterPage() {
                     card you provide.
                     <br />
                     <strong>
-                      Your seat is Reserved until the final payment clears, then
+                      Your seat is reserved until the final payment clears, then
                       Confirmed.
                     </strong>
                   </div>
