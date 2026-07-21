@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import Script from "next/script";
 import { useRouter } from "next/navigation";
 import { PRICING, DATES, INCLUSIONS, money, longDate } from "@/lib/config";
@@ -17,6 +17,14 @@ declare global {
  *
  * We send the server: the one-time token, the registration id, and the fact
  * that the agent accepted the authorization. Nothing else.
+ *
+ * Forte.js API per CSG Forte's published integration sample:
+ *   forte.createToken({ api_login_id, card_number, expire_year,
+ *                       expire_month, cvv })
+ *        .success(cb)
+ *        .error(cb)
+ *
+ * There is no setAPILoginID method — the login id travels in the data object.
  */
 export default function PayForm({
   registrationId,
@@ -44,63 +52,79 @@ export default function PayForm({
   const [error, setError] = useState<string | null>(null);
   const formRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!ready || !window.forte) return;
-    window.forte.setAPILoginID(fortePublicKey);
-  }, [ready, fortePublicKey]);
+  async function chargeWithToken(oneTimeToken: string) {
+    try {
+      const r = await fetch("/api/payments/charge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          registration_id: registrationId,
+          one_time_token: oneTimeToken,
+          consent_accepted: true,
+        }),
+      });
+      const data = await r.json().catch(() => ({}));
 
-  async function pay() {
+      if (!r.ok) {
+        setError(data.error ?? "Your card was declined. Try another card.");
+        setBusy(false);
+        return;
+      }
+      router.refresh();
+    } catch {
+      setError("We couldn't reach the server. Your card was not charged.");
+      setBusy(false);
+    }
+  }
+
+  function pay() {
     if (!accepted) {
       setError("Please accept the payment authorization to continue.");
       return;
     }
+    if (!window.forte || typeof window.forte.createToken !== "function") {
+      setError("The payment form didn't load. Refresh the page and try again.");
+      return;
+    }
+
     setBusy(true);
     setError(null);
 
     const el = (id: string) =>
       (document.getElementById(id) as HTMLInputElement).value.trim();
 
-    // Forte.js callback style. Verify the exact signature against the current
-    // Forte.js docs for your account before going to production.
-    window.forte.createToken(
-      {
+    window.forte
+      .createToken({
         api_login_id: fortePublicKey,
-        account_number: el("card_number"),
-        expire_year: Number(el("exp_year")),
-        expire_month: Number(el("exp_month")),
-        card_verification_value: el("cvv"),
-      },
-      async (res: any) => {
-        if (res?.event === "failure" || !res?.onetime_token) {
+        card_number: el("card_number"),
+        expire_year: el("exp_year"),
+        expire_month: el("exp_month"),
+        cvv: el("cvv"),
+      })
+      .success((res: any) => {
+        const token = res?.onetime_token ?? res?.token;
+        if (!token) {
           setError(res?.response_description ?? "We couldn't read that card.");
           setBusy(false);
           return;
         }
-
-        const r = await fetch("/api/payments/charge", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            registration_id: registrationId,
-            one_time_token: res.onetime_token,
-            consent_accepted: true,
-          }),
-        });
-        const data = await r.json();
-
-        if (!r.ok) {
-          setError(data.error ?? "Your card was declined. Try another card.");
-          setBusy(false);
-          return;
-        }
-        router.refresh();
-      }
-    );
+        chargeWithToken(token);
+      })
+      .error((res: any) => {
+        setError(res?.response_description ?? "We couldn't read that card.");
+        setBusy(false);
+      });
   }
 
   return (
     <>
-      <Script src={forteJsUrl} onLoad={() => setReady(true)} />
+      <Script
+        src={forteJsUrl}
+        onLoad={() => setReady(true)}
+        onError={() =>
+          setError("The payment form didn't load. Refresh the page and try again.")
+        }
+      />
 
       <p className="eyebrow">Step 2 of 2</p>
       <h1>Payment</h1>
