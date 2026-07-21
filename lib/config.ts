@@ -61,23 +61,41 @@ export const DUNNING = {
   cancelAfterDays: 14, // cancel + release the seat
 } as const;
 
-export const OFFICES = [
-  "Cedar Hill",
-  "Dallas",
-  "DeSoto",
-  "Duncanville",
-  "Ellis County",
-  "Fort Worth",
-  "Granbury",
-  "Mansfield",
-  "Mesquite",
-  "Midlothian",
-  "North Homes Realty",
-  "Rockwall",
-  "Weatherford",
-  "Corporate",
-  "Other",
-] as const;
+/**
+ * Office → Regional Sales Manager. Picking an office auto-fills the RSM on the
+ * form, so agents can't mistype it. Single source of truth for both.
+ */
+export const OFFICE_RSM: Record<string, string> = {
+  "Arlington Regional Office": "Jim Jackson",
+  "Cedar Hill Regional Office": "Jon Buck",
+  "Dallas - Bishop Arts": "Kevin Robinson",
+  "Flower Mound/Irving Regional Office": "Anna Hoff",
+  "Fort Worth Regional Office": "Cassy Nutt",
+  "Grand Prairie Regional Office": "Joe Picardo",
+  "Southlake/Colleyville Regional Office": "Brad Horak",
+  "Dallas - Lake Highlands Regional Office": "Betty DeVinney",
+  "Decatur/Bridgeport Regional Office": "Allie Hendricks",
+  "Denton Regional Office": "Lindsey Grissette",
+  "Frisco/McKinney Regional Office": "Frances Cruz",
+  "North Fort Worth - Alliance Regional Office": "Allie Hendricks",
+  "Plano Regional Office": "Lynn Carlton",
+  "Rockwall Regional Office": "Robert Kennedy",
+  "Ennis Regional Office": "Carla Smith",
+  "Granbury/Glen Rose Office": "Kristi Hiller",
+  "Mansfield Regional Office": "Kris Johnson",
+  "Midlothian Regional Office": "DeAnne Fite",
+  "Springtown Regional Office": "Ragan Carr",
+  "Waco Regional Office": "Mike Sims",
+  "Waxahachie Regional Office": "Carla Smith",
+  "Weatherford Regional Office": "Ragan Carr",
+  "Choctaw/Harrah Regional Office": "Jennifer Grimes",
+  "Edmond Regional Office": "Natalie Hardin",
+  "Guthrie Regional Office": "Jennifer Grimes",
+  "Norman Regional Office": "Amy Bladow",
+  "CSC": "Ashley Conlon",
+};
+
+export const OFFICES = Object.keys(OFFICE_RSM);
 
 // ---------------------------------------------------------------------------
 // Payment authorization — stored verbatim in consents.consent_text.
