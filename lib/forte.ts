@@ -1,18 +1,18 @@
 /**
  * CSG Forte REST API v3 client. SERVER-SIDE ONLY.
  *
- * The v3 `transaction` object accepts: action, authorization_amount,
- * reference_id, billing_address, card, echeck, customer_token, paymethod_token.
- * There is NO `paymethod` member.
+ * FORTE_API_SECURE_KEY must never reach the browser. Card data never touches
+ * this server — Forte.js tokenizes in the browser and hands us a one-time
+ * token, which we exchange for a stored paymethod token for installments 2
+ * and 3. That keeps us in SAQ-A scope.
  *
- * STILL UNVERIFIED: whether save_token belongs inside `card` or at the
- * transaction level. Check the FORTE log lines against a sandbox call and
- * confirm a paymethod_token comes back before trusting the 3-pay plan.
+ * NOTE: verify field names against the current Forte v3 docs before going to
+ * production. UAT and production have historically differed in response shape.
  */
 
-const BASE = process.env.FORTE_BASE_URL!;
-const ORG = process.env.FORTE_ORG_ID!;
-const LOC = process.env.FORTE_LOCATION_ID!;
+const BASE = process.env.FORTE_BASE_URL!; // sandbox vs production
+const ORG = process.env.FORTE_ORG_ID!; // org_xxxxxx
+const LOC = process.env.FORTE_LOCATION_ID!; // loc_xxxxxx
 
 function headers() {
   const basic = Buffer.from(
@@ -28,7 +28,7 @@ function headers() {
 const txnUrl = () =>
   `${BASE}/organizations/${ORG}/locations/${LOC}/transactions`;
 
-expoexpoexpoexpoexesult = {
+export type ForteResult = {
   approved: boolean;
   transactionId?: string;
   paymethodToken?: string;
@@ -40,12 +40,13 @@ expoexpoexpoexpoexesult = {
 };
 
 function parse(data: any): ForteResult {
+  console.log("FORTE RESPONSE", JSON.stringify(data));
   const code = data?.response?.response_code;
   return {
     approved: code === "A01",
     transactionId: data?.transaction_id,
     paymethodToken: data?.paymethod_token,
-    last4: data?.card?.last_4_account_number ?? data?.card?.masked_account_number,
+    last4: data?.card?.last_4_account_number,
     cardType: data?.card?.card_type,
     code,
     message: data?.response?.response_desc,
@@ -53,31 +54,24 @@ function parse(data: any): ForteResult {
   };
 }
 
-async function post(body: Record<string, unknown>): Promise<ForteResult> {
-  const res = await fetch(txnUrl(), {
-    method: "POST",
-    headers: headers(),
-    body: JSON.stringify(body),
-  });
-
-  const text = await res.text();
-  let data: any = {};
-  try {
-    data = JSON.parse(text);
-  } catch {
-    data = { parse_error: true, bod    data = { parse_onsole.log("FORTE REQUEST ", JSON.stringify(body));
-  console.log("FORTE RESPONSE", res.status, text);
-
-  return par  return par  return par Billing = {
+export type Billing = {
   first_name: string;
   last_name: string;
-  physical_a  physical_a  pst  physical_a  physg;
+  physical_address?: {
+    street_line1?: string;
     locality?: string;
     region?: string;
     postal_code?: string;
   };
 };
 
+/**
+ * Charge a one-time token from Forte.js. Used for pay-in-full, and for
+ * installment #1 at signup.
+ *
+ * `save_token: true` asks Forte to return a reusable paymethod token, which we
+ * persist for installments 2 and 3. Without it, the 3-pay plan cannot work.
+ */
 export async function saleWithOneTimeToken(opts: {
   oneTimeToken: string;
   amount: number;
@@ -85,33 +79,61 @@ export async function saleWithOneTimeToken(opts: {
   billing: Billing;
   saveToken?: boolean;
 }): Promise<ForteResult> {
-  return post({
-    action: "sale",
-    autho    autho    autho    autho    autheference_id:    autho    autho    autho    autho    atime_token: opts.oneTimeToken,
-      save_token: opts.saveToken ?? false,
-    },
-    billing_address: opts.billing,
+  const res = await fetch(txnUrl(), {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({
+      action: "sale",
+      authorization_amount: opts.amount,
+      reference_id: opts.referenceId,
+      card: {
+        one_time_token: opts.oneTimeToken,
+        save_token: opts.saveToken ?? false,
+      },
+      billing_address: opts.billing,
+    }),
   });
+  return parse(await res.json());
 }
 
+/** Charge a STORED paymethod token. Used by the cron for installments 2 and 3. */
 export async function saleWithStoredToken(opts: {
   paymethodToken: string;
   amount: number;
   referenceId: string;
 }): Promise<ForteResult> {
-  return  ret({
-    action: "sale",
-    authorization_amo    authorization_amo    authorization_amo    authorization_amo    authorization_amo    authorization_}
+  const res = await fetch(txnUrl(), {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({
+      action: "sale",
+      authorization_amount: opts.amount,
+      reference_id: opts.referenceId,
+      paymethod_token: opts.paymethodToken,
+    }),
+  });
+  return parse(await res.json());
+}
 
+/**
+ * Refund a settled transaction. Note: refunds can also be issued by hand in
+ * Dex. Doing it here keeps our payments table as the source of truth and
+ * writes an audit row — prefer this path.
+ */
 export async function refund(opts: {
   originalTransactionId: string;
   amount: number;
   referenceId: string;
 }): Promise<ForteResult> {
-  return post({
-    action: "reverse",
-    authorization_amount: opts.amount,
-    original_transaction_id: opts.originalTransac   nId,
-    reference_id: opts.referenceId,
+  const res = await fetch(txnUrl(), {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({
+      action: "reverse",
+      authorization_amount: opts.amount,
+      original_transaction_id: opts.originalTransactionId,
+      reference_id: opts.referenceId,
+    }),
   });
+  return parse(await res.json());
 }
