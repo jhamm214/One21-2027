@@ -4,7 +4,34 @@
  * Change a date here and the form, the cron, the emails, and the admin
  * dashboard all follow.
  */
+/**
+ * Refund and transfer policy. Must match the Registration Packet word for
+ * word, same as the consent texts above.
+ */
+export const REFUND_POLICY = {
+  contactEmail: "c21events@century21.net",
+  processingFeePct: 3.5,
+  noFeeThrough: "2026-12-31",
+  reducedFeeThrough: "2027-01-26",
+  reducedFeeAmount: 100,
+  noRefundsFrom: "2027-01-27",
+  transferFee: 50,
+} as const;
 
+export const REFUND_POLICY_HTML = `
+  <h3>Cancellations and transfers</h3>
+  <p>To cancel, notify us in writing at
+     <a href="mailto:${"c21events@century21.net"}">c21events@century21.net</a>.
+     Refunds are less the 3.5% credit card processing fee.</p>
+  <ul>
+    <li>Through <strong>December 31, 2026</strong> — no cancellation fee.</li>
+    <li><strong>January 1&ndash;26, 2027</strong> — refunded less a $100 processing fee.</li>
+    <li><strong>On and after January 27, 2027</strong> — cancellations are not accepted and no refunds are issued.</li>
+  </ul>
+  <p>You may instead transfer your registration to another CENTURY 21 franchisee,
+     affiliated broker, or agent for a $50 transfer fee. Email your request to
+     <a href="mailto:c21events@century21.net">c21events@century21.net</a> with your
+     name, registration number, and the full details of the person taking your place.</p>`;
 export const CONFERENCE = {
   name: "ONE21 Conference",
   shortName: "C21JFC Conference",
