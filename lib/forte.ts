@@ -88,8 +88,8 @@ export async function saleWithOneTimeToken(opts: {
       reference_id: opts.referenceId,
       card: {
         one_time_token: opts.oneTimeToken,
-        save_token: opts.saveToken ?? false,
       },
+      save_token: opts.saveToken ?? false,
       billing_address: opts.billing,
     }),
   });
