@@ -17,8 +17,12 @@ export default function Home() {
 
   return (
     <>
+      <img
+        src="/one21-c21jfc-horizontal.png"
+        alt="ONE21 Experience — CENTURY 21 Judge Fite Company"
+        style={{ width: 340, maxWidth: "100%", height: "auto", margin: "0 0 28px" }}
+      />
       <p className="eyebrow">{longDate(CONFERENCE.startsOn)}</p>
-      <h1>{CONFERENCE.name}</h1>
 
       <p style={{ fontSize: "1.1rem", color: "var(--ink-70)" }}>
         One form. One payment. One person to call. Register below — your

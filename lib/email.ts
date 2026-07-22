@@ -4,9 +4,9 @@
  *
  * Every email ends with Rebecca. One contact, everywhere.
  */
-import { CONTACT, CONFERENCE, DATES, longDate, money, PRICING } from "./config";
+import { CONTACT, CONFERENCE, DATES, longDate, money, PRICING, REFUND_POLICY_HTML } from "./config";
 
-const FROM = process.env.MAIL_FROM ?? "conference@judgefite.com";
+const FROM = process.env.MAIL_FROM ?? "one21experience@judgefite.com";
 
 async function send(to: string, subject: string, html: string) {
   if (!process.env.RESEND_API_KEY) {
@@ -31,8 +31,14 @@ const footer = `
     <a href="mailto:${CONTACT.email}">${CONTACT.email}</a>
   </p>`;
 
+const header = `
+  <img src="${process.env.APP_URL}/one21-c21jfc-email-header.png"
+       alt="ONE21 Experience — CENTURY 21 Judge Fite Company"
+       width="300"
+       style="display:block;margin:0 0 28px;max-width:100%;height:auto;border:0">`;
+
 const wrap = (body: string) =>
-  `<div style="max-width:560px;margin:0 auto;font:16px/1.6 system-ui;color:#111">${body}${footer}</div>`;
+  `<div style="max-width:560px;margin:0 auto;font:16px/1.6 system-ui;color:#111">${header}${body}${footer}</div>`;
 
 /** Sent the moment the form is submitted — before any payment. */
 export function confirmFormReceived(to: string, name: string, id: string) {
@@ -59,7 +65,8 @@ export function confirmPaidInFull(to: string, name: string, id: string) {
        <li>Conference begins <strong>${longDate(CONFERENCE.startsOn)}</strong>.</li>
        <li><strong>Book your own hotel and travel.</strong> Your fee covers conference registration only.</li>
        <li>Watch for the agenda and session sign-ups closer to the date.</li>
-     </ul>`
+     </ul>
+     ${REFUND_POLICY_HTML}`
   );
 }
 
@@ -77,6 +84,7 @@ export function confirmReserved(to: string, name: string, id: string) {
        <li>${money(PRICING.installmentAmount)} on <strong>${longDate(DATES.installment3)}</strong></li>
      </ul>
      <p>These charge automatically to the card on file. Nothing further is required from you.</p>
+     ${REFUND_POLICY_HTML}
      <p>Your fee covers <strong>conference registration only</strong>. Hotel, travel, and meals are booked and paid separately by you.</p>`
   );
 }
